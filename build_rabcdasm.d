@@ -1,5 +1,6 @@
 /*
  *  Copyright 2010, 2011, 2012 Vladimir Panteleev <vladimir@thecybershadow.net>
+ *  Portions Copyright 2013 Tony Tyson <teesquared@twistedwords.net>
  *  This file is part of RABCDAsm.
  *
  *  RABCDAsm is free software: you can redistribute it and/or modify
@@ -33,7 +34,7 @@ version(DigitalMars)
 else
 	const DEFAULT_COMPILER = "gdmd";
 
-const DEFAULT_FLAGS = "-O -inline";
+const DEFAULT_FLAGS = "-O -inline -release";
 const LZMA_FLAGS = "-version=HAVE_LZMA";
 
 import std.exception;
@@ -103,7 +104,11 @@ int main()
 		if (haveLZMA)
 			flags ~= " " ~ LZMA_FLAGS;
 
-		foreach (program; ["rabcasm", "rabcdasm", "abcexport", "abcreplace", "swfbinexport", "swfbinreplace", "swfdecompress", "swf7zcompress"])
+		flags ~= " -J.";
+
+		stderr.writeln("* Compliler flags are (" ~ flags ~ ")");
+
+		foreach (program; ["rabcasm", "rabcdasm", "abcexport", "abcreplace", "swfbinexport", "swfbinreplace", "swfdecompress", "swf7zcompress", "flasturbate"])
 			compile(program);
 
 		if (haveLZMA)

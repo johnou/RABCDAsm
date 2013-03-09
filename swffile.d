@@ -1,5 +1,6 @@
 /*
  *  Copyright 2010, 2011, 2012 Vladimir Panteleev <vladimir@thecybershadow.net>
+ *  Portions Copyright 2013 Tony Tyson <teesquared@twistedwords.net>
  *  This file is part of RABCDAsm.
  *
  *  RABCDAsm is free software: you can redistribute it and/or modify
@@ -77,6 +78,16 @@ final class SWFFile
 	ubyte[] write()
 	{
 		return SWFWriter.write(this);
+	}
+
+	ubyte[] writeHeader()
+	{
+		return SWFWriter.writeHeader(this);
+	}
+
+	ubyte[] writeTag(Tag tag)
+	{
+		return SWFWriter.writeTag(tag);
 	}
 }
 
@@ -179,6 +190,7 @@ private final class SWFReader
 		}
 		t.length = length;
 		t.data = cast(ubyte[])readRaw(length);
+		assert(t.length == t.data.length);
 		return t;
 	}
 }
@@ -254,8 +266,145 @@ enum TagType
 	DefineFont4                  = 91
 }
 
+string[] tagNames = [
+	"End",
+	"ShowFrame",
+	"DefineShape",
+	"FreeCharacter",
+	"PlaceObject",
+	"RemoveObject",
+	"DefineBits",
+	"DefineButton",
+	"JPEGTables",
+	"SetBackgroundColor",
+	"DefineFont",
+	"DefineText",
+	"DoAction",
+	"DefineFontInfo",
+	"DefineSound",
+	"StartSound",
+	"UNKNOWN16",
+	"DefineButtonSound",
+	"SoundStreamHead",
+	"SoundStreamBlock",
+	"DefineBitsLossless",
+	"DefineBitsJPEG2",
+	"DefineShape2",
+	"DefineButtonCxform",
+	"Protect",
+	"PathsArePostScript",
+	"PlaceObject2",
+	"UNKNOWN27",
+	"RemoveObject2",
+	"UNKNOWN29",
+	"UNKNOWN30",
+	"UNKNOWN31",
+	"DefineShape3",
+	"DefineText2",
+	"DefineButton2",
+	"DefineBitsJPEG3",
+	"DefineBitsLossless2",
+	"DefineEditText",
+	"UNKNOWN38",
+	"DefineSprite",
+	"UNKNOWN40",
+	"ProductInfo",
+	"UNKNOWN42",
+	"FrameLabel",
+	"UNKNOWN44",
+	"SoundStreamHead2",
+	"DefineMorphShape",
+	"UNKNOWN47",
+	"DefineFont2",
+	"UNKNOWN49",
+	"UNKNOWN50",
+	"UNKNOWN51",
+	"UNKNOWN52",
+	"UNKNOWN53",
+	"UNKNOWN54",
+	"UNKNOWN55",
+	"ExportAssets",
+	"ImportAssets",
+	"EnableDebugger",
+	"DoInitAction",
+	"DefineVideoStream",
+	"VideoFrame",
+	"DefineFontInfo2",
+	"DebugID",
+	"EnableDebugger2",
+	"ScriptLimits",
+	"SetTabIndex",
+	"UNKNOWN67",
+	"UNKNOWN68",
+	"FileAttributes",
+	"PlaceObject3",
+	"ImportAssets2",
+	"DoABC",
+	"DefineFontAlignZones",
+	"CSMTextSettings",
+	"DefineFont3",
+	"SymbolClass",
+	"Metadata",
+	"DefineScalingGrid",
+	"UNKNOWN79",
+	"UNKNOWN80",
+	"UNKNOWN81",
+	"DoABC2",
+	"DefineShape4",
+	"DefineMorphShape2",
+	"UNKNOWN85",
+	"DefineSceneAndFrameLabelData",
+	"DefineBinaryData",
+	"DefineFontName",
+	"UNKNOWN89",
+	"UNKNOWN90",
+	"DefineFont4",
+	"UNKNOWN92",
+	"UNKNOWN93",
+	"UNKNOWN94",
+	"UNKNOWN95",
+	"UNKNOWN96",
+	"UNKNOWN97",
+	"UNKNOWN98",
+	"UNKNOWN99",
+];
+
 private final class SWFWriter
 {
+	static ubyte[] writeTag(SWFFile.Tag tag)
+	{
+		ubyte[] buf;
+
+		ushort u = cast(ushort)(tag.type << 6);
+		if (tag.length < 0x3F && !tag.forceLongLength)
+		{
+			u |= tag.length;
+			buf ~= toArray(u);
+		}
+		else
+		{
+			u |= 0x3F;
+			buf ~= toArray(u);
+			uint l = to!uint(tag.length);
+			buf ~= toArray(l);
+		}
+		buf ~= tag.data;
+
+		return buf;
+	}
+
+	static ubyte[] writeHeader(SWFFile swf)
+	{
+		ubyte[] buf;
+
+		buf ~= toArray(swf.header);
+		buf ~= swf.frameSize.bytes;
+		buf ~= toArray(swf.frameRate);
+		buf ~= toArray(swf.frameCount);
+
+		return buf;
+	}
+
 	static ubyte[] write(SWFFile swf)
 	{
 		ubyte[] buf;

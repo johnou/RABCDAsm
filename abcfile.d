@@ -1,5 +1,6 @@
 /*
  *  Copyright 2010, 2011, 2012 Vladimir Panteleev <vladimir@thecybershadow.net>
+ *  Portions Copyright 2013 Tony Tyson <teesquared@twistedwords.net>
  *  This file is part of RABCDAsm.
  *
  *  RABCDAsm is free software: you can redistribute it and/or modify
@@ -21,6 +22,8 @@ module abcfile;
 import std.string : format; // exception formatting
 import std.conv;
 import std.exception;
+
+import swffile;
 
 /**
  * Implements a shallow representation of an .abc file.
@@ -46,6 +49,9 @@ class ABCFile
 	Class[] classes;
 	Script[] scripts;
 	MethodBody[] bodies;
+
+	bool[uint] namespaceCache;
+	bool[uint] multinameCache;
 
 	enum long NULL_INT = long.max;
 	enum ulong NULL_UINT = ulong.max;
@@ -249,6 +255,25 @@ class ABCFile
 		uint varName;
 	}
 
+	static bool isTagType(ref SWFFile.Tag tag)
+	{
+		return tag.type == TagType.DoABC || tag.type == TagType.DoABC2;
+	}
+
+	static ubyte[] getTagData(ref SWFFile.Tag tag)
+	{
+		if (tag.type == TagType.DoABC)
+			return tag.data;
+
+		ubyte[] data;
+
+		auto p = tag.data.ptr+4; // skip flags
+		while (*p++) {} // skip name
+		data = tag.data[p-tag.data.ptr..$];
+
+		return data;
+	}
+
 	static ABCFile read(ubyte[] data)
 	{
 		return (new ABCReader(data)).abc;
@@ -257,6 +282,57 @@ class ABCFile
 	ubyte[] write()
 	{
 		return (new ABCWriter(this)).buf;
+	}
+
+	bool isNamespace(uint n)
+	{
+		if (!namespaceCache)
+		{
+			foreach (ref value; namespaces[1..$])
+				namespaceCache[value.name] = true;
+
+			namespaceCache.rehash();
+		}
+
+		return (n in namespaceCache) != null;
+	}
+
+	bool isMultiname(uint n)
+	{
+		if (!multinameCache)
+		{
+			foreach (ref value; multinames[1..$])
+				switch (value.kind)
+				{
+					case ASType.QName:
+					case ASType.QNameA:
+						multinameCache[value.QName.name] = true;
+						break;
+					case ASType.RTQName:
+					case ASType.RTQNameA:
+						multinameCache[value.RTQName.name] = true;
+						break;
+					case ASType.RTQNameL:
+					case ASType.RTQNameLA:
+						break;
+					case ASType.Multiname:
+					case ASType.MultinameA:
+						multinameCache[value.Multiname.name] = true;
+						break;
+					case ASType.MultinameL:
+					case ASType.MultinameLA:
+						break;
+					case ASType.TypeName:
+						multinameCache[value.TypeName.name] = true;
+						break;
+					default:
+						throw new Exception("Unknown Multiname kind [" ~ format("0x%X", value.kind) ~ "]");
+				}
+
+			multinameCache.rehash();
+		}
+
+		return (n in multinameCache) != null;
 	}
 }
 
