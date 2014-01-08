@@ -49,7 +49,7 @@ class SwfObfuscator
 {
 	SwfObfuscatorOptions opt;
 
-	uint[string] playerGlobals;
+	uint[string] globalSymbols;
 
 	bool[string] excludes;
 	bool[string] includes;
@@ -77,49 +77,48 @@ class SwfObfuscator
 		if (opt.fixedNamesFile)
 			initializeFixedNames(opt.fixedNamesFile);
 
-		initializePlayerGlobals(opt.playerGlobalFile);
+		foreach (g; opt.globalFiles)
+			initializeGlobalSymbols(g);
+
+		globalSymbols.rehash();
+
+		if (opt.verbose)
+			foreach (key, val; globalSymbols)
+				writefln("GSY: %s = %d", key, val);
 	}
 
-	void initializePlayerGlobals(string playerGlobalFile)
+	void initializeGlobalSymbols(string globalFile)
 	{
-		if (!exists(playerGlobalFile))
+		if (!exists(globalFile))
 		{
-			const string msg =
-				"The player global file is required and does not exist! " ~ playerGlobalFile ~ "\n"
-				"You can download the latest from http://www.adobe.com/support/flashplayer/downloads.html";
+			const string msg = "The global file does not exist! " ~ globalFile;
 			throw new Exception(msg);
 		}
 
-		ZipArchive zip = new ZipArchive(read(playerGlobalFile));
+		ZipArchive zip = new ZipArchive(read(globalFile));
 
 		scope swf = SWFFile.read(zip.expand(zip.directory["library.swf"]));
 
 		foreach (uint count, ref tag; swf.tags)
 		{
 			if (opt.verbose)
-				writefln("PGS: %d %s %d %s %s", count, tagNames[tag.type], tag.length,
+				writefln("GSY: %d %s %d %s %s", count, tagNames[tag.type], tag.length,
 						 tag.forceLongLength ? "true" : "false", toHexString(md5Of(tag.data)));
 
 			ABCFile abc = readTag!(ABCFile)(tag);
 
 			for (uint n = 1; abc && n < abc.strings.length; ++n)
-				++playerGlobals[abc.strings[n]];
+				++globalSymbols[abc.strings[n]];
 
 			SymFile sym = readTag!(SymFile)(tag);
 
 			if (opt.verbose && sym)
 			{
-				writefln("PGS: sym.symbols.length = %d", sym.symbols.length);
+				writefln("GSY: sym.symbols.length = %d", sym.symbols.length);
 				foreach (symbol; sym.symbols)
-					writefln("PGS: idref = %d, name = %s", symbol.idref, symbol.name);
+					writefln("GSY: idref = %d, name = %s", symbol.idref, symbol.name);
 			}
 		}
-
-		playerGlobals.rehash();
-
-		if (opt.verbose)
-			foreach (key, val; playerGlobals)
-				writefln("PGS: %s = %d", key, val);
 	}
 
 	void initializeExcludes(string excludesFile)
@@ -205,7 +204,7 @@ class SwfObfuscator
 
 	string reformatName(uint n, uint p)
 	{
-		return format("%dt%ds%d", tagNumber, n, p);
+		return format("%s%dt%ds%d", opt.namePrefix, tagNumber, n, p);
 	}
 
 	string renameFull(string s, uint n)
@@ -271,7 +270,7 @@ class SwfObfuscator
 		if (name in includes)
 			return true;
 
-		if (name in excludes || name in playerGlobals || isUrl(name))
+		if (name in excludes || name in globalSymbols || isUrl(name))
 			return false;
 
 		return abc.isNamespace(n) || abc.isMultiname(n);
@@ -342,7 +341,7 @@ class SwfObfuscator
 
 			if (!sealed)
 			{
-				abc.strings ~= opt.sealText;
+				//abc.strings ~= opt.sealText;
 				sealed = true;
 			}
 

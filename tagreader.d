@@ -132,7 +132,7 @@ class TagReader
 				t.forceLongLength = true;
 		}
 		t.length = length;
-	    t.data = cast(ubyte[])readArray(length);
+		t.data = cast(ubyte[])readArray(length);
 		assert(t.length == t.data.length);
 		return t;
 	}

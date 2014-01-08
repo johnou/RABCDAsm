@@ -28,7 +28,7 @@ import swfobfuscator;
 import swfobfuscatoroptions;
 import swftester;
 
-const string versionNumber = "0.0.1";
+const string versionNumber = "0.0.2";
 const string versionText = "flasturbate version " ~ versionNumber;
 
 const string usageText = q"EOS
@@ -56,7 +56,7 @@ void showFunny(int n = -1, string forceFunny = null)
 	{
 		string[] lines = funnyText.splitLines();
 		foreach (l; lines)
-			if (stripLeft(l)[0] != '#')
+			if (l = strip(l), l[0] != '#')
 				funnies ~= l;
 	}
 

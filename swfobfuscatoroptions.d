@@ -35,8 +35,9 @@ class SwfObfuscatorOptions
 	string fixedNamesFile = null;
 	string includesFile = null;
 	string outputExt = "out";
-	string playerGlobalFile = "playerglobal.swc";
+	string namePrefix = "";
 
+	string[] globalFiles;
 	string[] jsonNames;
 
 	const string optionText = q"EOS
@@ -45,11 +46,12 @@ Options:
       --fart                     don't use this option
   -f, --fixed=FILE               use a fixed renaming for names listed in FILE
       --funny                    this option is undocumented
+  -g, --globalFile=FILE          the global file to use (multiple supported, default: "./playerglobal.swc")
   -h, --help                     display this help and exit
   -i, --includes=FILE            include names that match any listed in FILE
   -j, --json                     the symbol name of a json binary tag you want processed (multiple supported)
+  -n, --namePrefix               prefix for each generated name (default: "")
   -o, --outputExt                the output file extension (default: "out")
-  -p, --playerGlobal=FILE        the player global file to use (default: "./playerglobal.swc")
   -q, --quiet                    do not print renames
   -t, --test                     load a swf, write it back out, and report any inconsistencies
   -v, --verbose                  enable verbose output
@@ -68,15 +70,19 @@ EOS";
 			"fart", &fart,
 			"fixed|f", &fixedNamesFile,
 			"funny", &funny,
-			"json|j", &jsonNames,
+			"globalFile|g", &globalFiles,
 			"help|h", &help,
 			"includes|i", &includesFile,
+			"json|j", &jsonNames,
+			"namePrefix|n", &namePrefix,
 			"outputExt|o", &outputExt,
-			"playerGlobal|p", &playerGlobalFile,
 			"quiet|q", &quiet,
 			"test|t", &test,
 			"verbose|v", &verbose,
 			"version", &version_,
 		);
+
+		if (globalFiles.length == 0)
+			globalFiles ~= "playerglobal.swc";
 	}
 }
