@@ -53,6 +53,8 @@ class ABCFile
 	bool[uint] namespaceCache;
 	bool[uint] multinameCache;
 
+	bool hasDebugOpcodes = false;
+
 	enum long NULL_INT = long.max;
 	enum ulong NULL_UINT = ulong.max;
 	enum double NULL_DOUBLE = double.init; // NaN
@@ -1413,7 +1415,10 @@ private final class ABCReader
 				scope(failure) pos = start + instructionOffset;
 				instructionAtOffset[instructionOffset] = to!uint(r.instructions.length);
 				ABCFile.Instruction instruction;
-				instruction.opcode = cast(Opcode)readU8();
+				const Opcode opcode = cast(Opcode)readU8();
+				if (!abc.hasDebugOpcodes && (opcode == Opcode.OP_debug || opcode == Opcode.OP_debugline || opcode == Opcode.OP_debugfile))
+					abc.hasDebugOpcodes = true;
+				instruction.opcode = opcode;
 				instruction.arguments.length = opcodeInfo[instruction.opcode].argumentTypes.length;
 				foreach (i, type; opcodeInfo[instruction.opcode].argumentTypes)
 					final switch (type)

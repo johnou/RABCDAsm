@@ -23,6 +23,7 @@ import std.getopt;
 
 class SwfObfuscatorOptions
 {
+	bool allowDebug = false;
 	bool fart = false;
 	bool funny = false;
 	bool help = false;
@@ -42,6 +43,7 @@ class SwfObfuscatorOptions
 
 	const string optionText = q"EOS
 Options:
+      --allowDebug               allow enable debugger tags and debug opcodes
   -e, --excludes=FILE            exclude names that match any listed in FILE
       --fart                     don't use this option
   -f, --fixed=FILE               use a fixed renaming for names listed in FILE
@@ -66,6 +68,7 @@ EOS";
 
 		getopt(
 			args,
+			"allowDebug", &allowDebug,
 			"excludes|e", &excludesFile,
 			"fart", &fart,
 			"fixed|f", &fixedNamesFile,

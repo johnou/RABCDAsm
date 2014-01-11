@@ -324,6 +324,12 @@ class SwfObfuscator
 			if (opt.verbose)
 				writeln("ABC: Processing abc ...");
 
+			if (abc.hasDebugOpcodes && !opt.allowDebug)
+			{
+				const string msg = "Debug opcodes found! (to force obfuscation enable the allowDebug command line option)";
+				throw new Exception(msg);
+			}
+
 			for (uint n = 1; n < abc.strings.length; ++n)
 			{
 				string name = abc.strings[n];
@@ -569,8 +575,19 @@ class SwfObfuscator
 		}
 	}
 
+	void checkEnableDebuggerTags(ref SWFFile.Tag tag)
+	{
+		if (!opt.allowDebug && (tag.type == 58 || tag.type == 64))
+		{
+			const string msg = "EnableDebugger tag found! (to force obfuscation enable the allowDebug command line option)";
+			throw new Exception(msg);
+		}
+	}
+
 	void processTag(ref SWFFile.Tag tag, ubyte swfver)
 	{
+		checkEnableDebuggerTags(tag);
+
 		processAbcTag(tag);
 		processBinTag(tag);
 		processExpTag(tag);
