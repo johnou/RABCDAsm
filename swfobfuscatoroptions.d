@@ -51,7 +51,7 @@ Options:
   -g, --globalFile=FILE          the global file to use (multiple supported, default: "./playerglobal.swc")
   -h, --help                     display this help and exit
   -i, --includes=FILE            include names that match any listed in FILE
-  -j, --json                     the symbol name of a json binary tag you want processed (multiple supported)
+  -j, --json                     the symbol name of a json binary tag to process (multiple supported)
   -n, --namePrefix               prefix for each generated name (default: "")
   -o, --outputExt                the output file extension (default: "out")
   -q, --quiet                    do not print renames
