@@ -326,7 +326,7 @@ class SwfObfuscator
 
 			if (abc.hasDebugOpcodes && !opt.allowDebug)
 			{
-				const string msg = "Debug opcodes found! (to force obfuscation enable the allowDebug command line option)";
+				const string msg = "Debug opcodes found! (to force obfuscation use the allowDebug command line option)";
 				throw new Exception(msg);
 			}
 
@@ -577,9 +577,9 @@ class SwfObfuscator
 
 	void checkEnableDebuggerTags(ref SWFFile.Tag tag)
 	{
-		if (!opt.allowDebug && (tag.type == 58 || tag.type == 64))
+		if (!opt.allowDebug && (tag.type == TagType.EnableDebugger || tag.type == TagType.EnableDebugger2))
 		{
-			const string msg = "EnableDebugger tag found! (to force obfuscation enable the allowDebug command line option)";
+			const string msg = "EnableDebugger tag found! (to force obfuscation use the allowDebug command line option)";
 			throw new Exception(msg);
 		}
 	}
