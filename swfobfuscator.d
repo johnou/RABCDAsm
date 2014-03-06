@@ -34,6 +34,7 @@ import std.zip;
 
 import swffile;
 import swfobfuscatoroptions;
+import tagoptions;
 import tagutils;
 
 import abcfile;
@@ -440,7 +441,9 @@ class SwfObfuscator
 
 	void processPobTag(ref SWFFile.Tag tag, ubyte ver)
 	{
-		PobFile pob = readTagVer!(PobFile)(tag, ver);
+		TagOptions tagOptions = new TagOptions(ver, opt.skipCacheAsBitmapByte);
+
+		PobFile pob = readTagOptions!(PobFile)(tag, tagOptions);
 
 		if (pob)
 		{

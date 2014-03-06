@@ -27,6 +27,7 @@ import std.stdio;
 import std.string : format;
 
 import swffile;
+import tagoptions;
 
 ubyte minBits(uint number, bool signed)
 {
@@ -59,10 +60,10 @@ T readTag(T)(ref SWFFile.Tag tag)
 	return null;
 }
 
-T readTagVer(T)(ref SWFFile.Tag tag, ubyte ver)
+T readTagOptions(T)(ref SWFFile.Tag tag, ref TagOptions tagOptions)
 {
 	if (T.isTagType(tag))
-		return T.read(cast(TagType)tag.type, T.getTagData(tag), ver);
+		return T.read(cast(TagType)tag.type, T.getTagData(tag), tagOptions);
 
 	return null;
 }

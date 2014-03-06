@@ -28,6 +28,7 @@ class SwfObfuscatorOptions
 	bool funny = false;
 	bool help = false;
 	bool quiet = false;
+	bool skipCacheAsBitmapByte = false;
 	bool test = false;
 	bool verbose = false;
 	bool version_ = false;
@@ -55,6 +56,7 @@ Options:
   -n, --namePrefix               prefix for each generated name (default: "")
   -o, --outputExt                the output file extension (default: "out")
   -q, --quiet                    do not print renames
+      --skipCacheAsBitmapByte    skip reading an extra byte for PlaceObject3 tags
   -t, --test                     load a swf, write it back out, and report any inconsistencies
   -v, --verbose                  enable verbose output
       --version                  output version information and exit
@@ -80,6 +82,7 @@ EOS";
 			"namePrefix|n", &namePrefix,
 			"outputExt|o", &outputExt,
 			"quiet|q", &quiet,
+			"skipCacheAsBitmapByte", &skipCacheAsBitmapByte,
 			"test|t", &test,
 			"verbose|v", &verbose,
 			"version", &version_,

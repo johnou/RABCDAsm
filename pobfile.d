@@ -26,6 +26,7 @@ import std.stdio;
 import std.string : format;
 
 import swffile;
+import tagoptions;
 import tagreader;
 import tagtypes;
 import tagwriter;
@@ -67,6 +68,7 @@ final class PobFile
 
 	TagType type;
 	ubyte swfVersion;
+	bool forceOneBitZeroTranslate;
 
 	bool isType1()
 	{
@@ -93,9 +95,9 @@ final class PobFile
 		return tag.data;
 	}
 
-	static PobFile read(TagType t, ubyte[] data, ubyte ver)
+	static PobFile read(TagType t, ubyte[] data, TagOptions tagOptions)
 	{
-		return (new PobReader(t, data, ver)).pob;
+		return (new PobReader(t, data, tagOptions)).pob;
 	}
 
 	ubyte[] write()
@@ -131,7 +133,7 @@ private final class PobReader : TagReader
 {
 	PobFile pob;
 
-	this(TagType t, ubyte[] buf, ubyte ver)
+	this(TagType t, ubyte[] buf, TagOptions tagOptions)
 	{
 		try
 		{
@@ -139,7 +141,7 @@ private final class PobReader : TagReader
 			pob = new PobFile();
 
 			pob.type = t;
-			pob.swfVersion = ver;
+			pob.swfVersion = tagOptions.swfVersion;
 
 			if (!pob.isType1())
 			{
@@ -207,7 +209,7 @@ private final class PobReader : TagReader
 			if (pob.hasBlendMode)
 				pob.blendMode = readU8();
 
-			if (pob.hasCacheAsBitmap)
+			if (pob.hasCacheAsBitmap && !tagOptions.skipCacheAsBitmapByte)
 				pob.bitmapCache = readU8();
 
 			if (pob.hasClipActions)
@@ -219,6 +221,7 @@ private final class PobReader : TagReader
 		{
 			stderr.writeln(e.msg);
 			stderr.writeln(pob);
+			stderr.writeln("To fix this issue, try ", tagOptions.skipCacheAsBitmapByte ? "not " : "" ,"using the option skipCacheAsBitmapByte.");
 			throw new Exception(format("%s(%d): Error at %d (0x%X):", e.file, e.line, pos, pos), e);
 		}
 	}
@@ -246,6 +249,8 @@ private final class PobReader : TagReader
 		uint nTranslateBits = readUBits(5);
 		m.translateX = readSBits(nTranslateBits);
 		m.translateY = readSBits(nTranslateBits);
+
+		pob.forceOneBitZeroTranslate = nTranslateBits == 1 && m.translateX == 0 && m.translateY == 0;
 	}
 
 	void readColorTransform(ref ColorTransform c)
@@ -594,6 +599,10 @@ private final class PobWriter : TagWriter
 		}
 
 		uint nTranslateBits = m.getNumTranslateBits();
+
+		if (nTranslateBits == 0 && pob.forceOneBitZeroTranslate)
+			nTranslateBits = 1;
+
 		writeUBits(nTranslateBits, 5);
 		writeSBits(m.translateX, nTranslateBits);
 		writeSBits(m.translateY, nTranslateBits);

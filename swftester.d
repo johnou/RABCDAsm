@@ -24,6 +24,8 @@ import std.file;
 import std.stdio;
 
 import swffile;
+import swfobfuscatoroptions;
+import tagoptions;
 import tagutils;
 
 import abcfile;
@@ -37,7 +39,15 @@ import symfile;
 
 class SwfTester
 {
-	void testTag(uint count, uint subcount, ref SWFFile.Tag tag, ubyte swfver)
+	SwfObfuscatorOptions opt;
+	bool mismatchFound;
+
+	this(ref SwfObfuscatorOptions o)
+	{
+		opt = o;
+	}
+
+	void testTag(uint count, uint subcount, ref SWFFile.Tag tag, ubyte swfVersion)
 	{
 		void showTagInfo(T)(T t, bool withHexDump = false)
 		{
@@ -45,6 +55,7 @@ class SwfTester
 			writefln("TAG: %d(%d) %s %d %s", count, subcount, tagNames[tag.type], tag.length, tag.forceLongLength);
 			if (withHexDump)
 				writeln(getHexDumpString(tag.data, "TAG"));
+			mismatchFound = true;
 		}
 
 		void readAndReplaceTag(T)()
@@ -63,7 +74,9 @@ class SwfTester
 			readAndReplaceTag!(ExpFile)();
 			readAndReplaceTag!(ImpFile)();
 
-			PobFile pob = readTagVer!(PobFile)(tag, swfver);
+			TagOptions tagOptions = new TagOptions(swfVersion, opt.skipCacheAsBitmapByte);
+
+			PobFile pob = readTagOptions!(PobFile)(tag, tagOptions);
 
 			if (pob && replaceTagData(tag, pob.write(), true))
 				showTagInfo(pob);
@@ -73,7 +86,7 @@ class SwfTester
 			if (spr)
 			{
 				foreach (uint sprCount, ref sprtag; spr.tags)
-					testTag(count, sprCount, sprtag, swfver);
+					testTag(count, sprCount, sprtag, swfVersion);
 
 				if (replaceTagData(tag, spr.write(), true))
 					showTagInfo(spr);
@@ -88,13 +101,19 @@ class SwfTester
 		}
 	}
 
-	void testSwf(string swfName, string outputExt)
+	void testSwf(string swfName)
 	{
 		SWFFile swf = SWFFile.read(cast(ubyte[])read(swfName));
 
-		foreach (uint count, ref tag; swf.tags)
-			testTag(count, 0, tag, swf.header.ver);
+		const ubyte swfVersion = swf.header.ver;
 
-		std.file.write(swfName ~ "." ~ outputExt, swf.write());
+		writefln("Testing (%s) SwfVersion (%d)", swfName, swfVersion);
+
+		foreach (uint count, ref tag; swf.tags)
+			testTag(count, 0, tag, swfVersion);
+
+		std.file.write(swfName ~ "." ~ opt.outputExt, swf.write());
+
+		writefln(mismatchFound ? "Failed! (%d)" : "Success! (%d)", swfVersion);
 	}
 }
