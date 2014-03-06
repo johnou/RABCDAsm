@@ -69,6 +69,7 @@ final class PobFile
 	TagType type;
 	ubyte swfVersion;
 	bool forceOneBitZeroTranslate;
+	bool skipCacheAsBitmapByte;
 
 	bool isType1()
 	{
@@ -142,6 +143,7 @@ private final class PobReader : TagReader
 
 			pob.type = t;
 			pob.swfVersion = tagOptions.swfVersion;
+			pob.skipCacheAsBitmapByte = tagOptions.skipCacheAsBitmapByte;
 
 			if (!pob.isType1())
 			{
@@ -209,7 +211,7 @@ private final class PobReader : TagReader
 			if (pob.hasBlendMode)
 				pob.blendMode = readU8();
 
-			if (pob.hasCacheAsBitmap && !tagOptions.skipCacheAsBitmapByte)
+			if (pob.hasCacheAsBitmap && !pob.skipCacheAsBitmapByte)
 				pob.bitmapCache = readU8();
 
 			if (pob.hasClipActions)
@@ -221,7 +223,7 @@ private final class PobReader : TagReader
 		{
 			stderr.writeln(e.msg);
 			stderr.writeln(pob);
-			stderr.writeln("To fix this issue, try ", tagOptions.skipCacheAsBitmapByte ? "not " : "" ,"using the option skipCacheAsBitmapByte.");
+			stderr.writeln("To fix this issue, try ", pob.skipCacheAsBitmapByte ? "not " : "" ,"using the option skipCacheAsBitmapByte.");
 			throw new Exception(format("%s(%d): Error at %d (0x%X):", e.file, e.line, pos, pos), e);
 		}
 	}
@@ -569,7 +571,7 @@ private final class PobWriter : TagWriter
 		if (pob.hasBlendMode)
 			writeU8(pob.blendMode);
 
-		if (pob.hasCacheAsBitmap)
+		if (pob.hasCacheAsBitmap && !pob.skipCacheAsBitmapByte)
 			writeU8(pob.bitmapCache);
 
 		if (pob.hasClipActions)
