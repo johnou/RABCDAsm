@@ -55,6 +55,8 @@ final class PobFile
 	ClipActions clipActions;
 
 	// v3
+	bool hasOpaqueBackground;
+	bool hasVisible;
 	bool hasImage;
 	bool hasClassName;
 	bool hasCacheAsBitmap;
@@ -65,6 +67,8 @@ final class PobFile
 	Filter[] surfaceFilterList;
 	ubyte blendMode;
 	ubyte bitmapCache;
+	ubyte visible;
+	uint backgroundColor;
 
 	TagType type;
 	ubyte swfVersion;
@@ -120,6 +124,8 @@ final class PobFile
 		if (hasColorTransform) r ~= format("hasColorTransform (%s) ", colorTransform.toString());
 		if (hasCharacterId) r ~= format("hasCharacterId (%d) ", characterId);
 		if (hasMove) r ~= "hasMove ";
+		if (hasOpaqueBackground) r ~= "hasOpaqueBackground ";
+		if (hasVisible) r ~= format("hasVisible (%d, %d) ", visible, backgroundColor);
 		if (hasImage) r ~= "hasImage ";
 		if (hasClassName) r ~= format("hasClassName (%s) ", className);
 		if (hasCacheAsBitmap) r ~= format("hasCacheAsBitmap (%d) ", bitmapCache);
@@ -159,8 +165,8 @@ private final class PobReader : TagReader
 				if (!pob.isType2())
 				{
 					enforce(readBit() == false, "Invalid bit value!");
-					enforce(readBit() == false, "Invalid bit value!");
-					enforce(readBit() == false, "Invalid bit value!");
+					pob.hasOpaqueBackground = readBit();
+					pob.hasVisible = readBit();
 					pob.hasImage = readBit();
 					pob.hasClassName = readBit();
 					pob.hasCacheAsBitmap = readBit();
@@ -182,7 +188,7 @@ private final class PobReader : TagReader
 			else
 			{
 				pob.depth = readU16();
-				if (pob.hasClassName)
+				if (pob.hasClassName || (pob.hasImage && pob.hasCharacterId))
 					pob.className = readStringZ();
 				if (pob.hasCharacterId)
 					pob.characterId = readU16();
@@ -213,6 +219,14 @@ private final class PobReader : TagReader
 
 			if (pob.hasCacheAsBitmap && !pob.skipCacheAsBitmapByte)
 				pob.bitmapCache = readU8();
+
+			if (pob.hasVisible)
+			{
+				pob.visible = readU8();
+
+				if (pob.visible)
+					pob.backgroundColor = readRgba();
+			}
 
 			if (pob.hasClipActions)
 				readClipActions(pob.clipActions);
@@ -527,7 +541,9 @@ private final class PobWriter : TagWriter
 
 			if (!pob.isType2())
 			{
-				writeBits(0, 3);
+				writeBits(0, 1);
+				writeBit(pob.hasOpaqueBackground);
+				writeBit(pob.hasVisible);
 				writeBit(pob.hasImage);
 				writeBit(pob.hasClassName);
 				writeBit(pob.hasCacheAsBitmap);
@@ -544,7 +560,7 @@ private final class PobWriter : TagWriter
 		else
 		{
 			writeU16(pob.depth);
-			if (pob.hasClassName)
+			if (pob.hasClassName || (pob.hasImage && pob.hasCharacterId))
 				writeStringZ(pob.className);
 			if (pob.hasCharacterId)
 				writeU16(pob.characterId);
@@ -573,6 +589,14 @@ private final class PobWriter : TagWriter
 
 		if (pob.hasCacheAsBitmap && !pob.skipCacheAsBitmapByte)
 			writeU8(pob.bitmapCache);
+
+		if (pob.hasVisible)
+		{
+			writeU8(pob.visible);
+
+			if (pob.visible)
+				writeRgba(pob.backgroundColor);
+		}
 
 		if (pob.hasClipActions)
 			writeClipActions(pob.clipActions);

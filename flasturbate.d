@@ -28,7 +28,7 @@ import swfobfuscator;
 import swfobfuscatoroptions;
 import swftester;
 
-const string versionNumber = "1.0.2";
+const string versionNumber = "1.0.3";
 const string versionText = "flasturbate version " ~ versionNumber;
 
 const string usageText = q"EOS
