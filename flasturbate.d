@@ -28,12 +28,12 @@ import swfobfuscator;
 import swfobfuscatoroptions;
 import swftester;
 
-const string versionNumber = "1.0.3";
+const string versionNumber = "1.0.4";
 const string versionText = "flasturbate version " ~ versionNumber;
 
 const string usageText = q"EOS
 Usage: flasturbate [OPTION] FILE ...
-A tool that let's you play with your swf.
+A tool that lets you play with your swf.
 EOS";
 
 const string copyrightText = q"EOS

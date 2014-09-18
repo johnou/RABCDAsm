@@ -221,12 +221,10 @@ private final class PobReader : TagReader
 				pob.bitmapCache = readU8();
 
 			if (pob.hasVisible)
-			{
 				pob.visible = readU8();
 
-				if (pob.visible)
-					pob.backgroundColor = readRgba();
-			}
+			if (pob.hasOpaqueBackground)
+				pob.backgroundColor = readRgba();
 
 			if (pob.hasClipActions)
 				readClipActions(pob.clipActions);
@@ -591,12 +589,10 @@ private final class PobWriter : TagWriter
 			writeU8(pob.bitmapCache);
 
 		if (pob.hasVisible)
-		{
 			writeU8(pob.visible);
 
-			if (pob.visible)
-				writeRgba(pob.backgroundColor);
-		}
+		if (pob.hasOpaqueBackground)
+			writeRgba(pob.backgroundColor);
 
 		if (pob.hasClipActions)
 			writeClipActions(pob.clipActions);
