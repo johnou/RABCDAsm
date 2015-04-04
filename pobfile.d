@@ -40,14 +40,14 @@ final class PobFile
 	ColorTransform colorTransform;
 
 	// v2
-	bool hasClipActions;
-	bool hasClipDepth;
-	bool hasName;
-	bool hasRatio;
-	bool hasColorTransform;
-	bool hasMatrix;
-	bool hasCharacterId;
-	bool hasMove;
+	bool hasClipActions = false;
+	bool hasClipDepth = false;
+	bool hasName = false;
+	bool hasRatio = false;
+	bool hasColorTransform = false;
+	bool hasMatrix = false;
+	bool hasCharacterId = false;
+	bool hasMove = false;
 
 	ushort ratio;
 	string name;
@@ -55,13 +55,13 @@ final class PobFile
 	ClipActions clipActions;
 
 	// v3
-	bool hasOpaqueBackground;
-	bool hasVisible;
-	bool hasImage;
-	bool hasClassName;
-	bool hasCacheAsBitmap;
-	bool hasBlendMode;
-	bool hasFilterList;
+	bool hasOpaqueBackground = false;
+	bool hasVisible = false;
+	bool hasImage = false;
+	bool hasClassName = false;
+	bool hasCacheAsBitmap = false;
+	bool hasBlendMode = false;
+	bool hasFilterList = false;
 
 	string className;
 	Filter[] surfaceFilterList;
@@ -72,8 +72,10 @@ final class PobFile
 
 	TagType type;
 	ubyte swfVersion;
-	bool forceOneBitZeroTranslate;
-	bool skipCacheAsBitmapByte;
+	bool forceOneBitZeroScale = false;
+	bool forceOneBitZeroRotate = false;
+	bool forceOneBitZeroTranslate = false;
+	bool skipCacheAsBitmapByte = false;
 
 	bool isType1()
 	{
@@ -188,8 +190,9 @@ private final class PobReader : TagReader
 			else
 			{
 				pob.depth = readU16();
-				if (pob.hasClassName || (pob.hasImage && pob.hasCharacterId))
+				if (pob.hasClassName)
 					pob.className = readStringZ();
+
 				if (pob.hasCharacterId)
 					pob.characterId = readU16();
 			}
@@ -207,6 +210,8 @@ private final class PobReader : TagReader
 
 			if (pob.hasName)
 				pob.name = readStringZ();
+
+			/// @todo read remainder as binary blob since the only 2 obfuscatable fields are name and className
 
 			if (pob.hasClipDepth)
 				pob.clipDepth = readU16();
@@ -250,6 +255,8 @@ private final class PobReader : TagReader
 			uint nScaleBits = readUBits(5);
 			m.scaleX = readSBits(nScaleBits);
 			m.scaleY = readSBits(nScaleBits);
+
+			pob.forceOneBitZeroScale = nScaleBits == 1 && m.scaleX == 0 && m.scaleY == 0;
 		}
 
 		m.hasRotate = readBit();
@@ -258,6 +265,8 @@ private final class PobReader : TagReader
 			uint nRotateBits = readUBits(5);
 			m.rotateSkew0 = readSBits(nRotateBits);
 			m.rotateSkew1 = readSBits(nRotateBits);
+
+			pob.forceOneBitZeroRotate = nRotateBits == 1 && m.rotateSkew0 == 0 && m.rotateSkew1 == 0;
 		}
 
 		uint nTranslateBits = readUBits(5);
@@ -513,7 +522,7 @@ private final class PobReader : TagReader
 			const uint length = readU16();
 			enforce(length > 0, "Invalid Action length!");
 			a.data = new ubyte[length];
-			readExact(a.data, length);
+			readExact(cast(void *) a.data, length);
 		}
 	}
 }
@@ -558,7 +567,7 @@ private final class PobWriter : TagWriter
 		else
 		{
 			writeU16(pob.depth);
-			if (pob.hasClassName || (pob.hasImage && pob.hasCharacterId))
+			if (pob.hasClassName)
 				writeStringZ(pob.className);
 			if (pob.hasCharacterId)
 				writeU16(pob.characterId);
@@ -606,6 +615,10 @@ private final class PobWriter : TagWriter
 		if (m.hasScale)
 		{
 			uint nScaleBits = m.getNumScaleBits();
+
+			if (nScaleBits == 0 && pob.forceOneBitZeroScale)
+				nScaleBits = 1;
+
 			writeUBits(nScaleBits, 5);
 			writeSBits(m.scaleX, nScaleBits);
 			writeSBits(m.scaleY, nScaleBits);
@@ -615,6 +628,10 @@ private final class PobWriter : TagWriter
 		if (m.hasRotate)
 		{
 			uint nRotateBits = m.getNumRotateBits();
+
+			if (nRotateBits == 0 && pob.forceOneBitZeroRotate)
+				nRotateBits = 1;
+
 			writeUBits(nRotateBits, 5);
 			writeSBits(m.rotateSkew0, nRotateBits);
 			writeSBits(m.rotateSkew1, nRotateBits);

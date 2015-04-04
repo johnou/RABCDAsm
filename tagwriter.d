@@ -190,7 +190,7 @@ class TagWriter
 			writeExact(&tag.length, 4);
 		}
 
-		writeExact(tag.data, tag.length);
+		writeExact(cast(void *) tag.data, tag.length);
 	}
 
 	void writeRgba(uint rgba)
