@@ -1451,6 +1451,8 @@ private final class ABCReader
 							ABCFile.Instruction instruction;
 							instruction.opcode = cast(Opcode)readU8();
 							enforce(instruction.opcode != Opcode.OP_raw, "Null opcode");
+							if (!abc.hasDebugOpcodes && (instruction.opcode == Opcode.OP_debug || instruction.opcode == Opcode.OP_debugline || instruction.opcode == Opcode.OP_debugfile))
+                            					abc.hasDebugOpcodes = true;
 							instruction.arguments.length = opcodeInfo[instruction.opcode].argumentTypes.length;
 							foreach (i, type; opcodeInfo[instruction.opcode].argumentTypes)
 								final switch (type)
