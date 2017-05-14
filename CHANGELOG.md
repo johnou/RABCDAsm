@@ -1,6 +1,56 @@
 RABCDAsm Changelog
 ==================
 
+RABCDAsm v1.18 (2016.01.16)
+---------------------------
+
+ * Fix disassembly of `pushbyte` instructions (the AVM specification 
+   incorrectly lists the argument as unsigned).
+ * Bump `#version` directive of new disassemblies to 4:
+   - Versions below 4 treat `pushbyte` as unsigned, and throw an exception if 
+     the argument is outside the range `0` ... `255`.
+   - Versions 4 and above treat `pushbyte` as signed, and throw an exception 
+     if the argument is outside the range `-128` ... `127`.
+ * Fix buffer reuse bugs when using macros
+ * Dump floating-point numbers in hex notation if necessary to ensure precision
+ * Cease emitting a number in a comment after opening `script` tags
+ * Detect a known DMD bug in `build_rabcdasm`
+ * Ignore invalid file size in header
+
+RABCDAsm v1.17 (2014.09.10)
+---------------------------
+
+ * Do not attempt to disassemble unreachable code
+ * Improve handling of disassembly errors:
+   methods will be partially disassembled as far as possible.
+ * Fix LZMA errors with uncompressable data.
+
+RABCDAsm v1.16 (2014.04.21)
+---------------------------
+
+ * Fix handling of TypeName-kind Multinames with null parameters
+ * Fix v1.15 regression in handling very long paths on Windows
+   (DMD 2.066 is required when building from source for this to work)
+
+RABCDAsm v1.15 (2014.01.11)
+---------------------------
+
+ * Fix building on systems with a noexec `/tmp/`
+ * Improve compatibility with 3rd-party players
+   * Don't emit forward references in TypeName-kind Multinames
+ * Improve performance and memory usage
+
+RABCDAsm v1.14 (2013.08.21)
+---------------------------
+
+ * Improved refid generation
+ * Worked around liblzma dictionary size limitation, which prevented 
+   decompression of some LZMA-compressed files
+ * Added an option to `swflzmacompress` to update the SWF version number
+ * Added `finddef` instruction
+ * Added unimplemented `{get|set|delete}propertylate` instructions
+ * Documentation updates
+
 RABCDAsm v1.13 (2012.09.29)
 ---------------------------
 

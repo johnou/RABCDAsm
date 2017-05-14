@@ -69,15 +69,19 @@ installed, compiling should be as straight-forward as:
 
 Substitute `dmd` with `gdmd` if you're using gdc. You can use the `DC` and 
 `DCFLAGS` environment variables to override the detected compiler and default 
-compilation flags (`-w -O -inline`).
+compilation flags (`-O -inline`).
 
 To be able to manipulate SWF files packed with LZMA compression, you'll need 
-to have the liblzma library and development files installed on your system.
+to have the [liblzma library][] and development files installed on your system.
+
+Note: DMD 2.066 is required for long path support on Windows since RABCDAsm 
+1.16.
 
   [d2]: http://dlang.org/
   [dmd]: http://www.digitalmars.com/d/download.html
   [gdc]: http://bitbucket.org/goshawk/gdc/
   [git]: http://git-scm.com/
+  [liblzma library]: http://tukaani.org/xz/
 
 Pre-compiled binaries
 ---------------------

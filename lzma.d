@@ -1,5 +1,5 @@
 /*
- *  Copyright 2012 Vladimir Panteleev <vladimir@thecybershadow.net>
+ *  Copyright 2012, 2013, 2014, 2016 Vladimir Panteleev <vladimir@thecybershadow.net>
  *  This file is part of RABCDAsm.
  *
  *  RABCDAsm is free software: you can redistribute it and/or modify
@@ -23,6 +23,7 @@ version(HAVE_LZMA) {} else static assert(0, "LZMA is not available (HAVE_LZMA ve
 import deimos.lzma;
 import std.conv;
 import std.exception;
+import std.string : format;
 
 version (Windows)
 	{ pragma(lib, "liblzma"); }
@@ -40,31 +41,47 @@ static assert(LZMAHeader.sizeof == 13);
 
 ubyte[] lzmaDecompress(LZMAHeader header, in ubyte[] compressedData)
 {
-	enforce(header.decompressedSize > 0, "Decompression with unknown size is unsupported");
-
 	lzma_stream strm;
 	lzmaEnforce(lzma_alone_decoder(&strm, ulong.max), "lzma_alone_decoder");
 	scope(exit) lzma_end(&strm);
 
-	auto outBuf = new ubyte[to!size_t(header.decompressedSize)];
-	strm.next_out  = outBuf.ptr;
-	strm.avail_out = outBuf.length;
+	auto outBuf = new ubyte[1024];
+	size_t pos = 0;
 
 	void decompress(in ubyte[] chunk)
 	{
-		strm.next_in  = chunk.ptr;
-		strm.avail_in = chunk.length;
-		lzmaEnforce!true(lzma_code(&strm, lzma_action.LZMA_RUN), "lzma_code (LZMA_RUN)");
+		strm.next_in   = chunk.ptr;
+		strm.avail_in  = chunk.length;
+
+	again:
+		strm.next_out  = outBuf.ptr    + pos;
+		strm.avail_out = outBuf.length - pos;
+		auto ret = lzma_code(&strm, lzma_action.LZMA_RUN);
+		pos = strm.next_out - outBuf.ptr;
+
+		if (ret == lzma_ret.LZMA_OK && strm.avail_in && !strm.avail_out)
+		{
+			outBuf.length = outBuf.length * 2;
+			goto again;
+		}
+		lzmaEnforce!true(ret, "lzma_code (LZMA_RUN)");
 		enforce(strm.avail_in == 0, "Not all data was read");
 	}
 
 	header.decompressedSize = -1; // Required as Flash uses End-of-Stream marker
+	fixDictSize(header.dictionarySize);
 	decompress(cast(ubyte[])(&header)[0..1]);
 	decompress(compressedData);
 
 	lzmaEnforce!true(lzma_code(&strm, lzma_action.LZMA_FINISH), "lzma_code (LZMA_FINISH)");
 
-	enforce(strm.avail_out == 0, "Decompressed size mismatch");
+//	enforce(strm.avail_out == 0,
+//		"Decompressed size mismatch (expected %d/0x%X, got %d/0x%X)".format(
+//			outBuf.length, outBuf.length,
+//			outBuf.length - strm.avail_out, outBuf.length - strm.avail_out,
+//	));
+
+	outBuf = outBuf[0..pos];
 
 	return outBuf;
 }
@@ -78,13 +95,12 @@ ubyte[] lzmaCompress(in ubyte[] decompressedData, LZMAHeader* header)
 	lzmaEnforce(lzma_alone_encoder(&strm, &opts), "lzma_alone_encoder");
 	scope(exit) lzma_end(&strm);
 
-	auto outBuf = new ubyte[decompressedData.length + 1024];
+	auto outBuf = new ubyte[decompressedData.length * 11 / 10 + 1024];
 	strm.next_out  = outBuf.ptr;
 	strm.avail_out = outBuf.length;
 	strm.next_in   = decompressedData.ptr;
 	strm.avail_in  = decompressedData.length;
 	lzmaEnforce(lzma_code(&strm, lzma_action.LZMA_RUN), "lzma_code (LZMA_RUN)");
-	scope(failure) { import std.stdio; writeln("avail_in=", strm.avail_in); }
 	enforce(strm.avail_in == 0, "Not all data was read");
 	enforce(strm.avail_out != 0, "Ran out of compression space");
 
@@ -98,4 +114,19 @@ private void lzmaEnforce(bool STREAM_END_OK=false)(lzma_ret v, string f)
 {
 	if (v != lzma_ret.LZMA_OK && (!STREAM_END_OK || v != lzma_ret.LZMA_STREAM_END))
 		throw new Exception(text(f, " error: ", v));
+}
+
+/// Work around an artificial lzma_alone_decoder limitation in liblzma
+/// which prevents it from accepting any streams with a dictionary size
+/// that is not 2^n or 2^n + 2^(n-1).
+/// See xz\src\liblzma\common\alone_decoder.c (git commit e7b424d267), line 87
+private void fixDictSize(ref uint d)
+{
+	--d;
+	d |= d >> 2;
+	d |= d >> 3;
+	d |= d >> 4;
+	d |= d >> 8;
+	d |= d >> 16;
+	++d;
 }

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2010, 2011, 2012 Vladimir Panteleev <vladimir@thecybershadow.net>
+ *  Copyright 2010, 2011, 2012, 2013, 2016 Vladimir Panteleev <vladimir@thecybershadow.net>
  *  Portions Copyright 2013 Tony Tyson <teesquared@twistedwords.net>
  *  This file is part of RABCDAsm.
  *
@@ -19,6 +19,7 @@
 
 /// A simple tool to build RABCDAsm in one command.
 /// You can use the DC and DCFLAGS environment variables to override the detected compiler and compilation flags.
+/// You can also pass program names or compilation options on the command-line to override the default ones.
 
 module build_rabcdasm;
 
@@ -35,7 +36,7 @@ else
 	const DEFAULT_COMPILER = "gdmd";
 
 const DEFAULT_FLAGS = "-O -inline -release";
-const LZMA_FLAGS = "-version=HAVE_LZMA";
+const LZMA_FLAGS = ["-version=HAVE_LZMA"];
 
 import std.exception;
 import std.file;
@@ -43,38 +44,64 @@ import std.process;
 import std.stdio;
 import std.string;
 
-string compiler, flags;
+string compiler;
+string[] flags;
 
 void compile(string program)
 {
 	stderr.writeln("* Building ", program);
-	enforce(system(format("rdmd --build-only --compiler=%s %s %s", compiler, flags, program)) == 0, "Compilation of " ~ program ~ " failed");
+	enforce(spawnProcess(["rdmd", "--build-only", "--compiler=" ~ compiler] ~ flags ~ program).wait() == 0, "Compilation of " ~ program ~ " failed");
 }
 
-void test(string code, string extraFlags=null)
+void test(string code, in string[] extraFlags=null)
 {
-	const FN = "test.d";
+	const BASE = "build_rabcdasm_buildtest";
+	const FN = BASE ~ ".d";
 	std.file.write(FN, code);
-	scope(exit) remove(FN);
-	enforce(system(format("rdmd --force --compiler=%s %s %s %s", compiler, flags, extraFlags, FN)) == 0, "Test failed");
+	scope(exit) foreach (de; dirEntries(".", BASE ~ "*", SpanMode.shallow)) remove(de.name);
+	enforce(spawnProcess(["rdmd", "--force", "--compiler=" ~ compiler, "-od."] ~ flags ~ extraFlags ~ FN).wait() == 0, "Test failed");
 	stderr.writeln(" >>> OK");
 }
 
-int main()
+void testBug(string description, int bugId, string code)
+{
+	stderr.writefln("* Checking for compiler bug %d...", bugId);
+	scope(failure)
+	{
+		stderr.writefln("Compiler bug detected: %s ( https://issues.dlang.org/show_bug.cgi?id=%d ).", description, bugId);
+		stderr.writeln("Try again with a different D compiler, compiler version, or build flags (DCFLAGS environment variable)");
+	}
+	test(code);
+}
+
+int main(string[] args)
 {
 	try
 	{
-		compiler = getenv("DC");
-		if (compiler is null)
-			compiler = DEFAULT_COMPILER;
+		auto programs = ["rabcasm", "rabcdasm", "abcexport", "abcreplace", "swfbinexport", "swfbinreplace", "swfdecompress", "swf7zcompress", "flasturbate"];
 
-		flags = getenv("DCFLAGS");
-		if (flags is null)
-			flags = DEFAULT_FLAGS;
+		compiler = environment.get("DC", DEFAULT_COMPILER);
+		flags = environment.get("DCFLAGS", DEFAULT_FLAGS).split(" ");
+
+		string[] optionArgs, programArgs;
+		foreach (arg; args[1..$])
+			(arg.startsWith("-") ? optionArgs : programArgs) ~= arg;
+
+		if (optionArgs.length)
+			flags = optionArgs;
+		if (programArgs.length)
+			programs = programArgs;
 
 		stderr.writeln("* Checking for working compiler...");
 		test(`
 			void main() {}
+		`);
+
+		testBug("[REG 2.064] Wrong code with -O on x86_64 for char comparisons", 11508, `
+			import assembler; int main() { foreach (c; "_") if (!Assembler.isWordChar(c)) return 1; return 0; }
+		`);
+		testBug("[REG 2.069] Wrong double-to-string conversion with -O", 15861, `
+			import std.format; int main() { return format("%.18g", 4286853117.0) == "4286853117" ? 0 : 1; }
 		`);
 
 		bool haveLZMA;
@@ -102,13 +129,13 @@ int main()
 			stderr.writeln(" >>> LZMA not found, building without LZMA support.");
 
 		if (haveLZMA)
-			flags ~= " " ~ LZMA_FLAGS;
+			flags ~= LZMA_FLAGS;
 
-		flags ~= " -J.";
+        flags ~= " -J.";
 
-		stderr.writeln("* Compliler flags are (" ~ flags ~ ")");
+        stderr.writeln("* Compliler flags are (" ~ flags ~ ")");
 
-		foreach (program; ["rabcasm", "rabcdasm", "abcexport", "abcreplace", "swfbinexport", "swfbinreplace", "swfdecompress", "swf7zcompress", "flasturbate"])
+		foreach (program; programs)
 			compile(program);
 
 		if (haveLZMA)

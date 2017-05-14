@@ -1,5 +1,5 @@
 /*
- *  Copyright 2010, 2011, 2012 Vladimir Panteleev <vladimir@thecybershadow.net>
+ *  Copyright 2010, 2011, 2012, 2013, 2014, 2015 Vladimir Panteleev <vladimir@thecybershadow.net>
  *  This file is part of RABCDAsm.
  *
  *  RABCDAsm is free software: you can redistribute it and/or modify
@@ -18,14 +18,17 @@
 
 module disassembler;
 
-import std.file;
-import std.string;
+import std.algorithm;
 import std.array;
 import std.conv;
+import std.digest.md;
 import std.exception;
-import std.algorithm;
+import std.file;
+import std.format;
 import std.path;
 import std.digest.md;
+import std.stdio;
+import std.string;
 import abcfile;
 import asprogram;
 import autodata;
@@ -35,37 +38,20 @@ alias std.array.join join;
 
 final class StringBuilder
 {
-	char[] buf;
-	size_t pos;
+	enum BUF_SIZE = 256*1024;
+
+	static char[] buf;
+	static size_t pos;
+
 	string filename;
+	File file;
 
 	this(string filename)
 	{
+		this.filename = filename;
 		if (exists(longPath(filename)))
 			throw new Exception(filename ~ " exists");
-		this.filename = filename;
-		buf.length = 1024;
-	}
 
-	void opCatAssign(string s)
-	{
-		checkIndent();
-		auto end = pos + s.length;
-		while (buf.length < end)
-			buf.length = buf.length*2;
-		buf[pos..end] = s;
-		pos = end;
-	}
-
-	void opCatAssign(char c)
-	{
-		if (buf.length < pos+1) // speed hack: no loop, no indent check
-			buf.length = buf.length*2;
-		buf[pos++] = c;
-	}
-
-	void save()
-	{
 		string[] dirSegments = split(filename, "/");
 		for (int l=0; l<dirSegments.length-1; l++)
 		{
@@ -73,7 +59,58 @@ final class StringBuilder
 			if (subdir.length && !exists(longPath(subdir)))
 				mkdir(longPath(subdir));
 		}
-		write(longPath(filename), buf[0..pos]);
+		file = openFile(filename, "wb");
+		assert(!pos, "Opening new file with unflushed buffer");
+	}
+
+	static this()
+	{
+		buf = new char[BUF_SIZE];
+	}
+
+	void put(in char[] s)
+	{
+		checkIndent();
+		auto end = pos + s.length;
+		if (end > buf.length)
+		{
+			flush();
+			end = s.length;
+			while (end > buf.length)
+				buf.length = buf.length*2;
+		}
+		buf[pos..end] = s[];
+		pos = end;
+	}
+
+	void put(char c)
+	{
+		if (pos == buf.length) // speed hack: no indent check
+			flush();
+		buf[pos++] = c;
+	}
+
+	alias put opCatAssign;
+
+	void write(T)(T v)
+	{
+		checkIndent();
+		formattedWrite(this, "%s", v);
+	}
+
+	void flush()
+	{
+		if (pos)
+		{
+			file.rawWrite(buf[0..pos]);
+			pos = 0;
+		}
+	}
+
+	void save()
+	{
+		flush();
+		file.close();
 	}
 
 	int indent;
@@ -473,7 +510,8 @@ final class RefBuilder : ASTraitsVisitor
 			}
 			else
 			{
-				if ((*pset)[priority].length==0 || (*pset)[priority][$-1] != context) // Optimization: don't add contexts identical to the last added
+				static bool rawEqual(T)(T[] arr1, T[] arr2) { return cast(ubyte[])arr1 == cast(ubyte[])arr2; }
+				if ((*pset)[priority].length==0 || !rawEqual((*pset)[priority][$-1], context)) // Optimization: don't add contexts identical to the last added
 					(*pset)[priority] ~= context.dup;
 				return false;
 			}
@@ -498,7 +536,7 @@ final class RefBuilder : ASTraitsVisitor
 				if (obj !in contexts)
 					getContext(refs, obj);
 
-			foreach (obj; contexts.keys.sort)
+			foreach (obj; contexts.keys.sort())
 			{
 				auto context = contexts[obj];
 				auto bname = refs.contextToString(context, false);
@@ -793,7 +831,7 @@ final class RefBuilder : ASTraitsVisitor
 			return;
 		}
 
-		auto myContext = context[0..myPos].dup;
+		auto myContext = context[0..myPos];
 		namespaces[ns.kind].add(ns.id, myContext, priority);
 	}
 
@@ -919,10 +957,7 @@ final class RefBuilder : ASTraitsVisitor
 					}
 
 				if (pathSegment.length > 240)
-				{
-					string md5s = toHexString(md5Of(pathSegment));
-					pathSegment = pathSegment[0..200] ~ '-' ~ md5s;
-				}
+					pathSegment = assumeUnique(pathSegment[0..200] ~ '-' ~ toHexString(md5Of(pathSegment)));
 			}
 
 			return arrayJoin(pathSegments, "/");
@@ -978,6 +1013,7 @@ final class Disassembler
 	ASProgram as;
 	string name, dir;
 	RefBuilder refs;
+	bool dumpRaw = true;
 
 	void newInclude(StringBuilder mainsb, string filename, void delegate(StringBuilder) callback, bool doInline = true)
 	{
@@ -990,6 +1026,7 @@ final class Disassembler
 				base = dirName(base), up++;
 			string rel  = replicate("../", up) ~ full[base.length+1..$];
 
+			mainsb.flush();
 			StringBuilder sb = new StringBuilder(full);
 			callback(sb);
 			sb.save();
@@ -1016,7 +1053,7 @@ final class Disassembler
 
 		StringBuilder sb = new StringBuilder(dir ~ "/" ~ name ~ ".main.asasm");
 
-		sb ~= "#version 3";
+		sb ~= "#version 4";
 		sb.newLine();
 
 		sb ~= "program";
@@ -1078,7 +1115,7 @@ final class Disassembler
 		if (v == ABCFile.NULL_INT)
 			sb ~= "null";
 		else
-			sb ~= to!string(v);
+			sb.write(v);
 	}
 
 	void dumpUInt(StringBuilder sb, ulong v)
@@ -1086,7 +1123,16 @@ final class Disassembler
 		if (v == ABCFile.NULL_UINT)
 			sb ~= "null";
 		else
-			sb ~= to!string(v);
+			sb.write(v);
+	}
+
+	static struct StaticBuf(T, size_t size)
+	{
+		T[size] buf;
+		size_t pos;
+		void put(T v) { buf[pos++] = v; }
+		void put(in T[] v) { buf[pos..pos+v.length] = v[]; pos+=v.length; }
+		T[] data() { return buf[0..pos]; }
 	}
 
 	void dumpDouble(StringBuilder sb, double v)
@@ -1095,16 +1141,40 @@ final class Disassembler
 			sb ~= "null";
 		else
 		{
-			string s = format("%.18g", v);
+			StaticBuf!(char, 64) buf;
+			formattedWrite(&buf, "%.18g", v);
+			char[] s = buf.data();
 
 			static double forceDouble(double d) { static double n; n = d; return n; }
 			if (s != "nan" && s != "inf" && s != "-inf")
 			{
-				foreach_reverse (i; 1..s.length)
-					if (s[i]>='0' && s[i]<='8' && forceDouble(to!double(s[0..i] ~ cast(char)(s[i]+1)))==v)
-						s = s[0..i] ~ cast(char)(s[i]+1);
-				while (s.length>2 && s[$-1]!='.' && forceDouble(to!double(s[0..$-1]))==v)
-					s = s[0..$-1];
+				if (forceDouble(to!double(s)) == v)
+				{
+					foreach_reverse (i; 1..s.length)
+						if (s[i]>='0' && s[i]<='8')
+						{
+							s[i]++;
+							if (forceDouble(to!double(s[0..i+1]))==v)
+								s = s[0..i+1];
+							else
+								s[i]--;
+						}
+					while (s.length>2 && s[$-1]!='.' && forceDouble(to!double(s[0..$-1]))==v)
+						s = s[0..$-1];
+				}
+				else
+				{
+					buf.pos = 0;
+					formattedWrite(&buf, "%.13a", v);
+					s = buf.data();
+					auto n = forceDouble(to!double(s));
+					assert(n == v,
+						"Can't print precise representation of double: %(%02X %) (%.18g) => %s => %(%02X %) (%.18g)".format(
+							cast(ubyte[])cast(void[])[v], v,
+							s,
+							cast(ubyte[])cast(void[])[n], n,
+						));
+				}
 			}
 			sb ~= s;
 		}
@@ -1493,8 +1563,7 @@ final class Disassembler
 
 	void dumpScript(StringBuilder sb, ASProgram.Script script, uint index)
 	{
-		sb ~= "script ; ";
-		sb ~= to!string(index);
+		sb ~= "script";
 		sb.indent++; sb.newLine();
 		dumpMethod(sb, script.sinit, "sinit");
 		dumpTraits(sb, script.traits, true);
@@ -1512,24 +1581,17 @@ final class Disassembler
 	void dumpLabel(StringBuilder sb, ref ABCFile.Label label)
 	{
 		sb ~= 'L';
-		sb ~= to!string(label.index);
+		sb.write(label.index);
 		if (label.offset != 0)
 		{
 			if (label.offset > 0)
 				sb ~= '+';
-			sb ~= to!string(label.offset);
+			sb.write(label.offset);
 		}
 	}
 
 	void dumpMethodBody(StringBuilder sb, ASProgram.MethodBody mbody)
 	{
-		if (mbody.error)
-		{
-			sb ~= "; Error while disassembling method: " ~ mbody.error;
-			sb.newLine();
-			sb.linePrefix = "; ";
-		}
-
 		sb ~= "body";
 		sb.indent++; sb.newLine();
 		dumpUIntField(sb, "maxstack", mbody.maxStack);
@@ -1545,17 +1607,7 @@ final class Disassembler
 			labels[e.from.index] = labels[e.to.index] = labels[e.target.index] = true;
 
 		sb.indent++;
-		if (mbody.error)
-			foreach (i, b; mbody.rawBytes)
-			{
-				sb ~= format("0x%02X", b);
-				if (i%16==15 || i==mbody.rawBytes.length-1)
-					sb.newLine();
-				else
-					sb ~= " ";
-			}
-		else
-			dumpInstructions(sb, mbody.instructions, labels);
+		dumpInstructions(sb, mbody.instructions, labels, mbody.errors);
 		sb.indent--;
 
 		sb ~= "end ; code";
@@ -1580,7 +1632,7 @@ final class Disassembler
 		sb.linePrefix = null;
 	}
 
-	void dumpInstructions(StringBuilder sb, ASProgram.Instruction[] instructions, bool[] labels)
+	void dumpInstructions(StringBuilder sb, ASProgram.Instruction[] instructions, bool[] labels, ABCFile.Error[] errors)
 	{
 		foreach (ref instruction; instructions)
 			foreach (i, type; opcodeInfo[instruction.opcode].argumentTypes)
@@ -1604,11 +1656,15 @@ final class Disassembler
 			{
 				sb.noIndent();
 				sb ~= 'L';
-				sb ~= to!string(ii);
+				sb.write(ii);
 				sb ~= ':';
 				sb.newLine();
 			}
 		}
+
+		string[] iErrors = new string[instructions.length + 1];
+		foreach (ref error; errors)
+			iErrors[error.loc.index] = error.msg;
 
 		bool extraNewLine = false;
 		foreach (uint ii, ref instruction; instructions)
@@ -1617,6 +1673,21 @@ final class Disassembler
 				sb.newLine();
 			extraNewLine = newLineAfter[instruction.opcode];
 			checkLabel(ii);
+
+			if (iErrors[ii])
+			{
+				sb ~= "; Error: ";
+				sb ~= iErrors[ii];
+				sb.newLine();
+			}
+
+			if (instruction.opcode == Opcode.OP_raw)
+			{
+				if (dumpRaw)
+					sb ~= "; 0x%02X".format(instruction.arguments[0].ubytev);
+				sb.newLine();
+				continue;
+			}
 
 			sb ~= opcodeInfo[instruction.opcode].name;
 			auto argTypes = opcodeInfo[instruction.opcode].argumentTypes;
@@ -1631,14 +1702,17 @@ final class Disassembler
 						case OpcodeArgumentType.Unknown:
 							throw new Exception("Don't know how to disassemble OP_" ~ opcodeInfo[instruction.opcode].name);
 
+						case OpcodeArgumentType.ByteLiteral:
+							sb.write(instruction.arguments[i].bytev);
+							break;
 						case OpcodeArgumentType.UByteLiteral:
-							sb ~= to!string(instruction.arguments[i].ubytev);
+							sb.write(instruction.arguments[i].ubytev);
 							break;
 						case OpcodeArgumentType.IntLiteral:
-							sb ~= to!string(instruction.arguments[i].intv);
+							sb.write(instruction.arguments[i].intv);
 							break;
 						case OpcodeArgumentType.UIntLiteral:
-							sb ~= to!string(instruction.arguments[i].uintv);
+							sb.write(instruction.arguments[i].uintv);
 							break;
 
 						case OpcodeArgumentType.Int:
@@ -1751,6 +1825,7 @@ static this()
 		Opcode.OP_si32,
 		Opcode.OP_sf32,
 		Opcode.OP_sf64,
+		Opcode.OP_throw,
 	])
 		newLineAfter[o] = true;
 }
