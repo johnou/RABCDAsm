@@ -44,40 +44,17 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE,
 to the extent permitted by law.
 EOS";
 
-const string funnyText = import("funny");
-
 const string sealText = "OBFUSCATED BY FLASTURBATE!";
-
-void showFunny(int n = -1, string forceFunny = null)
-{
-	static string[] funnies;
-
-	if (!funnies)
-	{
-		string[] lines = funnyText.splitLines();
-		foreach (l; lines)
-			if (l = strip(l), l && l[0] != '#')
-				funnies ~= l;
-	}
-
-	const string username = getenv("USERNAME") ? getenv("USERNAME") : "<your name>";
-	const auto rand = n < 0 || n >= funnies.length ? uniform(0, funnies.length) : n;
-	const string funny = replace(forceFunny ? forceFunny : funnies[rand], regex(r"\$\{?USERNAME\b\}?"), username);
-
-	stderr.writeln("  \"" ~ funny ~ "\"");
-}
 
 void showUsage(string optionText)
 {
 	stderr.writeln(usageText);
 	stderr.writeln(optionText);
-	showFunny();
 }
 
 void showCopyright()
 {
 	stderr.writeln(copyrightText);
-	showFunny();
 }
 
 void showVersion()
@@ -92,25 +69,13 @@ int main(string[] args)
 	{
 		SwfObfuscatorOptions opt = new SwfObfuscatorOptions(args, sealText);
 
-		if (opt.fart && opt.funny)
-		{
-			showFunny(-1, "The swf is strong in this one.");
-			return 42;
-		}
-
-		if (opt.fart)
-		{
-			showFunny(0);
-			return 0;
-		}
-
 		if (opt.version_)
 		{
 			showVersion();
 			return 0;
 		}
 
-		if (opt.help || (args.length == 1 && !opt.funny))
+		if (opt.help || (args.length == 1))
 		{
 			showUsage(opt.optionText);
 			return 0;
@@ -133,9 +98,6 @@ int main(string[] args)
 
 				swfObfuscator.reportWarnings();
 			}
-
-		if (opt.funny)
-			showFunny();
 	}
 	catch (Exception e)
 	{
@@ -146,7 +108,6 @@ int main(string[] args)
 		else
 		{
 			stderr.writefln("Error: %s\n", e.msg);
-			showFunny();
 		}
 
 		return 1;

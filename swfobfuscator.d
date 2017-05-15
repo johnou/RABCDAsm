@@ -561,7 +561,7 @@ class SwfObfuscator
 
 		if (bin && find(jsonIds, bin.characterId) != [])
 		{
-			JSONValue j = parseJSON(bin.binaryData);
+			JSONValue j = parseJSON(cast(ubyte[])bin.binaryData, JSONOptions.none);
 
 			renameKeys(j);
 
@@ -634,7 +634,8 @@ class SwfObfuscator
 			processTag(tag, swf.header.ver);
 		}
 
-		jsonIds.clear();
+        // TODO: dump to mapping file
+		jsonIds = null;//.clear();
 
 		std.file.write(swfName ~ "." ~ opt.outputExt, swf.write());
 	}

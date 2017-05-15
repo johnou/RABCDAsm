@@ -35,7 +35,7 @@ version(DigitalMars)
 else
 	const DEFAULT_COMPILER = "gdmd";
 
-const DEFAULT_FLAGS = "-O -inline -release";
+const DEFAULT_FLAGS = "-inline";
 const LZMA_FLAGS = ["-version=HAVE_LZMA"];
 
 import std.exception;
@@ -130,8 +130,6 @@ int main(string[] args)
 
 		if (haveLZMA)
 			flags ~= LZMA_FLAGS;
-
-        flags ~= " -J.";
 
         stderr.writeln("* Compliler flags are (" ~ flags ~ ")");
 

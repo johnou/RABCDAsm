@@ -24,8 +24,6 @@ import std.getopt;
 class SwfObfuscatorOptions
 {
 	bool allowDebug = false;
-	bool fart = false;
-	bool funny = false;
 	bool help = false;
 	bool quiet = false;
 	bool skipCacheAsBitmapByte = false;
@@ -46,9 +44,7 @@ class SwfObfuscatorOptions
 Options:
       --allowDebug               allow enable debugger tags and debug opcodes
   -e, --excludes=FILE            exclude names that match any listed in FILE
-      --fart                     don't use this option
   -f, --fixed=FILE               use a fixed renaming for names listed in FILE
-      --funny                    this option is undocumented
   -g, --globalFile=FILE          the global file to use (multiple supported, default: "./playerglobal.swc")
   -h, --help                     display this help and exit
   -i, --includes=FILE            include names that match any listed in FILE
@@ -72,9 +68,7 @@ EOS";
 			args,
 			"allowDebug", &allowDebug,
 			"excludes|e", &excludesFile,
-			"fart", &fart,
 			"fixed|f", &fixedNamesFile,
-			"funny", &funny,
 			"globalFile|g", &globalFiles,
 			"help|h", &help,
 			"includes|i", &includesFile,
